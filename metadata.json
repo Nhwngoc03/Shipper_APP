@@ -1,0 +1,7 @@
+{
+  "name": "Shipper Pro - Đối tác tài xế",
+  "description": "Ứng dụng PWA chuyên nghiệp dành cho đối tác tài xế giao hàng, hỗ trợ cài đặt trực tiếp lên điện thoại.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
