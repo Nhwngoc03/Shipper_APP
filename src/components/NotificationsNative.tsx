@@ -51,10 +51,10 @@ export default function NotificationsNative() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchNotifications(true)} tintColor="#10b981" />}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Thong bao</Text>
+        <Text style={styles.title}>Thông báo</Text>
         {unreadCount > 0 && (
           <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{unreadCount} moi</Text>
+            <Text style={styles.unreadBadgeText}>{unreadCount} mới</Text>
           </View>
         )}
       </View>
@@ -63,7 +63,7 @@ export default function NotificationsNative() {
         {notifications.length === 0 ? (
           <View style={styles.emptyBox}>
             <Bell size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>Chua co thong bao</Text>
+            <Text style={styles.emptyText}>Chưa có thông báo</Text>
           </View>
         ) : (
           notifications.map(notif => (

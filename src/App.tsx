@@ -68,11 +68,11 @@ export default function App() {
   const getHeaderTitle = (): string => {
     if (activeTab === 'messaging' && selectedConv) return selectedConv.otherUserName;
     const titles: Record<Tab, string> = {
-      home: 'Don hang moi',
-      active: 'Dang giao',
-      messaging: 'Tin nhan',
-      notifications: 'Thong bao',
-      profile: 'Ca nhan',
+      home: 'Đơn hàng mới',
+      active: 'Đang giao',
+      messaging: 'Tin nhắn',
+      notifications: 'Thông báo',
+      profile: 'Cá nhân',
     };
     return titles[activeTab];
   };
@@ -95,11 +95,11 @@ export default function App() {
       </View>
 
       <View style={styles.bottomNav}>
-        <NavItem icon={<LayoutGrid size={24} />} label="Don moi" active={activeTab === 'home'} onPress={() => setActiveTab('home')} />
-        <NavItem icon={<Truck size={24} />} label="Dang giao" active={activeTab === 'active'} onPress={() => setActiveTab('active')} />
-        <NavItem icon={<MessageSquare size={24} />} label="Tin nhan" active={activeTab === 'messaging'} onPress={() => { setSelectedConv(null); setActiveTab('messaging'); }} />
-        <NavItem icon={<Bell size={24} />} label="Thong bao" active={activeTab === 'notifications'} onPress={() => setActiveTab('notifications')} />
-        <NavItem icon={<User size={24} />} label="Ca nhan" active={activeTab === 'profile'} onPress={() => setActiveTab('profile')} />
+        <NavItem icon={<LayoutGrid size={24} />} label="Đơn mới" active={activeTab === 'home'} onPress={() => setActiveTab('home')} />
+        <NavItem icon={<Truck size={24} />} label="Đang giao" active={activeTab === 'active'} onPress={() => setActiveTab('active')} />
+        <NavItem icon={<MessageSquare size={24} />} label="Tin nhắn" active={activeTab === 'messaging'} onPress={() => { setSelectedConv(null); setActiveTab('messaging'); }} />
+        <NavItem icon={<Bell size={24} />} label="Thông báo" active={activeTab === 'notifications'} onPress={() => setActiveTab('notifications')} />
+        <NavItem icon={<User size={24} />} label="Cá nhân" active={activeTab === 'profile'} onPress={() => setActiveTab('profile')} />
       </View>
     </SafeAreaView>
   );

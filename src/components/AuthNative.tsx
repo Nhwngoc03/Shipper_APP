@@ -50,7 +50,7 @@ export default function AuthNative({ onLogin }: AuthNativeProps) {
       {isLogin ? (
         <LoginNative onLogin={onLogin} />
       ) : (
-        <RegisterNative onRegister={onLogin} />
+        <RegisterNative onRegister={() => setIsLogin(true)} />
       )}
     </ScrollView>
   );

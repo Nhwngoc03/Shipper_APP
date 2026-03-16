@@ -23,8 +23,8 @@ const formatDateLabel = (iso: string) => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    if (d.toDateString() === today.toDateString()) return 'Hom nay';
-    if (d.toDateString() === yesterday.toDateString()) return 'Hom qua';
+    if (d.toDateString() === today.toDateString()) return 'Hôm nay';
+    if (d.toDateString() === yesterday.toDateString()) return 'Hôm qua';
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch { return ''; }
 };
@@ -47,7 +47,7 @@ export default function ChatDetailNative({ conversation, currentUserId, onBack }
     let mounted = true;
     chatService.getChatHistory(conversation.otherUserId)
       .then(h => { if (mounted) { setMessages(h); setLoading(false); scrollToBottom(); } })
-      .catch(() => { if (mounted) { setError('Khong tai duoc tin nhan'); setLoading(false); } });
+      .catch(() => { if (mounted) { setError('Không tải được tin nhắn'); setLoading(false); } });
 
     chatService.connect(() => {
       chatService.subscribeToConversation(currentUserId, conversation.otherUserId, (msg) => {
@@ -79,7 +79,7 @@ export default function ChatDetailNative({ conversation, currentUserId, onBack }
         id: 0,
         conversationId: conversation.id,
         senderId: currentUserId,
-        senderName: 'Toi',
+        senderName: 'Tôi',
         content: text,
         sentAt: new Date().toISOString(),
         isRead: false,
@@ -135,7 +135,7 @@ export default function ChatDetailNative({ conversation, currentUserId, onBack }
       >
         {grouped.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>Bat dau cuoc tro chuyen</Text>
+            <Text style={styles.emptyText}>Bắt đầu cuộc trò chuyện</Text>
           </View>
         ) : grouped.map(group => (
           <View key={group.label}>
@@ -165,7 +165,7 @@ export default function ChatDetailNative({ conversation, currentUserId, onBack }
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
-          placeholder="Nhap tin nhan..."
+          placeholder="Nhập tin nhắn..."
           placeholderTextColor="#94a3b8"
           value={input}
           onChangeText={setInput}

@@ -28,6 +28,12 @@ class AuthService {
     const data = await res.json();
     if (!res.ok) throw { status: res.status, data };
     if (data.result?.token) {
+      // Kiểm tra role — chỉ cho SHIPPER login vào app này
+      const payload = JSON.parse(atob(data.result.token.split('.')[1]));
+      const role: string = payload?.scope || payload?.role || '';
+      if (!role.includes('SHIPPER')) {
+        throw { status: 403, data: { message: 'Ứng dụng này chỉ dành cho Shipper. Vui lòng dùng ứng dụng khác.' } };
+      }
       localStorage.setItem(TOKEN_KEY, data.result.token);
     }
     return data;
