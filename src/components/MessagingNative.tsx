@@ -1,255 +1,229 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Image
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  TextInput, ActivityIndicator, RefreshControl
 } from 'react-native';
-import {
-  MessageSquare,
-  Clock,
-  ChevronRight
-} from 'lucide-react-native';
-
-interface Conversation {
-  id: number;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unread: number;
-  status: 'online' | 'offline' | 'delivering';
-}
+import { MessageSquare, Search, ChevronRight } from 'lucide-react-native';
+import { chatService, Conversation } from '../services/chat.service';
 
 interface MessagingNativeProps {
-  onSelectChat: (conversationId: number) => void;
+  onSelectChat: (conv: Conversation) => void;
 }
 
-const mockConversations: Conversation[] = [
-  {
-    id: 1,
-    name: 'Nguyễn Văn B',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=600&auto=format&fit=crop',
-    lastMessage: 'Cảm ơn bạn! 😊',
-    timestamp: '10 phút trước',
-    unread: 0,
-    status: 'delivering',
-  },
-  {
-    id: 2,
-    name: 'Trần Thị C',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=600&auto=format&fit=crop',
-    lastMessage: 'Bạn đã tới chưa?',
-    timestamp: '30 phút trước',
-    unread: 2,
-    status: 'online',
-  },
-  {
-    id: 3,
-    name: 'Lê Văn D',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=600&auto=format&fit=crop',
-    lastMessage: 'Đơn hàng được giao thành công',
-    timestamp: '2 giờ trước',
-    unread: 0,
-    status: 'offline',
-  },
-  {
-    id: 4,
-    name: 'Phạm Thị E',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop',
-    lastMessage: 'Ok, tôi sẽ đợi bạn ở cửa',
-    timestamp: 'Hôm qua',
-    unread: 0,
-    status: 'offline',
-  },
-];
+const ADMIN_USER_ID = 6;
+const SUPPORT_NAME = 'Trung tâm hỗ trợ';
+
+const formatTime = (iso: string): string => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diffMin < 1) return 'Vừa xong';
+    if (diffMin < 60) return `${diffMin}ph`;
+    if (diffMin < 1440) return `${Math.floor(diffMin / 60)}g`;
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  } catch { return ''; }
+};
+
+const getInitial = (name: string) => (name || '?').charAt(0).toUpperCase();
+
+const getRoleLabel = (role: string) => {
+  switch (role?.toUpperCase()) {
+    case 'BUYER': return 'Khách hàng';
+    case 'SHOP_OWNER': return 'Chủ shop';
+    case 'ADMIN': return 'Hỗ trợ';
+    default: return role || '';
+  }
+};
 
 export default function MessagingNative({ onSelectChat }: MessagingNativeProps) {
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'online': return '#10b981';
-      case 'delivering': return '#f59e0b';
-      case 'offline': return '#94a3b8';
-      default: return '#94a3b8';
-    }
-  };
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const getStatusLabel = (status: string) => {
-    switch(status) {
-      case 'online': return 'Online';
-      case 'delivering': return 'Đang giao';
-      case 'offline': return 'Offline';
-      default: return '';
+  const loadConversations = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const convs = await chatService.getConversations();
+
+      // Ghim Admin/Support lên đầu — đồng nhất với web FE ChatPage
+      const adminConv = convs.find(c => c.otherUserId === ADMIN_USER_ID);
+      let result: Conversation[];
+
+      if (!adminConv) {
+        const supportPlaceholder: Conversation = {
+          id: -1, roomKey: '',
+          otherUserId: ADMIN_USER_ID,
+          otherUserName: SUPPORT_NAME,
+          otherUserRole: 'ADMIN',
+          lastMessage: 'Bắt đầu trò chuyện với trung tâm hỗ trợ',
+          lastMessageAt: new Date().toISOString(),
+          unreadCount: 0,
+        };
+        result = [supportPlaceholder, ...convs];
+      } else {
+        const updated = { ...adminConv, otherUserName: SUPPORT_NAME };
+        result = [updated, ...convs.filter(c => c.otherUserId !== ADMIN_USER_ID)];
+      }
+
+      setConversations(result);
+    } catch {
+      // giữ nguyên nếu lỗi
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => { loadConversations(); }, []);
+
+  const filtered = conversations.filter(c =>
+    c.otherUserName?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Header + Search */}
       <View style={styles.headerSection}>
-        <View style={styles.headerContent}>
-          <MessageSquare size={24} color="#10b981" />
+        <View style={styles.headerRow}>
+          <MessageSquare size={22} color="#10b981" />
           <View>
             <Text style={styles.headerTitle}>Tin nhắn</Text>
-            <Text style={styles.headerSubtitle}>Quản lý trò chuyện</Text>
+            <Text style={styles.headerSub}>{conversations.length} cuộc trò chuyện</Text>
           </View>
+        </View>
+        <View style={styles.searchBox}>
+          <Search size={16} color="#94a3b8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm cuộc trò chuyện..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor="#cbd5e1"
+          />
         </View>
       </View>
 
-      {/* Conversations List */}
-      <View style={styles.conversationsList}>
-        {mockConversations.map((conversation) => (
-          <TouchableOpacity
-            key={conversation.id}
-            style={styles.conversationCard}
-            onPress={() => onSelectChat(conversation.id)}
-          >
-            <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: conversation.avatar }}
-                style={styles.avatar}
-              />
-              <View
-                style={[
-                  styles.statusIndicator,
-                  { backgroundColor: getStatusColor(conversation.status) }
-                ]}
-              />
-            </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadConversations(true)} tintColor="#10b981" />}
+      >
+        {filtered.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <MessageSquare size={40} color="#e2e8f0" />
+            <Text style={styles.emptyText}>{search ? 'Không tìm thấy' : 'Chưa có tin nhắn'}</Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {filtered.map(conv => (
+              <TouchableOpacity
+                key={conv.id}
+                style={[styles.card, conv.unreadCount > 0 && styles.cardUnread]}
+                onPress={() => onSelectChat(conv)}
+              >
+                {/* Avatar */}
+                <View style={[styles.avatar, conv.otherUserId === ADMIN_USER_ID && styles.avatarAdmin]}>
+                  <Text style={[styles.avatarText, conv.otherUserId === ADMIN_USER_ID && styles.avatarTextAdmin]}>
+                    {getInitial(conv.otherUserName)}
+                  </Text>
+                  {conv.unreadCount > 0 && (
+                    <View style={styles.unreadDot}>
+                      <Text style={styles.unreadDotText}>
+                        {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
-            <View style={styles.conversationContent}>
-              <View style={styles.nameRow}>
-                <Text style={styles.conversationName}>{conversation.name}</Text>
-                <Text style={styles.conversationTime}>{conversation.timestamp}</Text>
-              </View>
-              <View style={styles.messageRow}>
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                  {conversation.lastMessage}
-                </Text>
-                {conversation.unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{conversation.unread}</Text>
+                {/* Info */}
+                <View style={styles.info}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name} numberOfLines={1}>{conv.otherUserName}</Text>
+                    <Text style={styles.time}>{formatTime(conv.lastMessageAt)}</Text>
                   </View>
-                )}
-              </View>
-              <Text style={styles.statusText}>{getStatusLabel(conversation.status)}</Text>
-            </View>
+                  <View style={styles.subRow}>
+                    <View style={styles.roleBadge}>
+                      <Text style={styles.roleText}>{getRoleLabel(conv.otherUserRole)}</Text>
+                    </View>
+                    <Text
+                      style={[styles.lastMsg, conv.unreadCount > 0 && styles.lastMsgUnread]}
+                      numberOfLines={1}
+                    >
+                      {conv.lastMessage || 'Bắt đầu cuộc trò chuyện'}
+                    </Text>
+                  </View>
+                </View>
 
-            <ChevronRight size={20} color="#cbd5e1" />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </ScrollView>
+                <ChevronRight size={18} color="#cbd5e1" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   headerSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    backgroundColor: 'white', paddingHorizontal: 20, paddingTop: 20,
+    paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
   },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
+  headerSub: { fontSize: 11, fontWeight: '600', color: '#94a3b8' },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#f1f5f9', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#e2e8f0',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#0f172a',
+  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', color: '#0f172a' },
+  list: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 },
+  emptyBox: { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  emptyText: { fontSize: 14, fontWeight: '700', color: '#94a3b8' },
+  card: {
+    backgroundColor: 'white', borderRadius: 16, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  conversationsList: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    gap: 12,
-  },
-  conversationCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
+  cardUnread: { backgroundColor: '#f0fdf4' },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center',
   },
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: 'white',
+  avatarAdmin: { backgroundColor: '#d1fae5' },
+  avatarText: { fontSize: 18, fontWeight: '900', color: '#64748b' },
+  avatarTextAdmin: { color: '#10b981' },
+  unreadDot: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#ef4444', borderRadius: 10,
+    minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: 'white', paddingHorizontal: 3,
   },
-  conversationContent: {
-    flex: 1,
+  unreadDotText: { fontSize: 9, fontWeight: '800', color: 'white' },
+  info: { flex: 1, gap: 4 },
+  nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  name: { fontSize: 14, fontWeight: '800', color: '#0f172a', flex: 1, marginRight: 8 },
+  time: { fontSize: 11, fontWeight: '500', color: '#94a3b8' },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roleBadge: {
+    backgroundColor: '#f1f5f9', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  conversationName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  conversationTime: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#94a3b8',
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  lastMessage: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  unreadBadge: {
-    backgroundColor: '#10b981',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  unreadText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'white',
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
+  roleText: { fontSize: 9, fontWeight: '800', color: '#64748b', textTransform: 'uppercase' },
+  lastMsg: { flex: 1, fontSize: 12, fontWeight: '500', color: '#94a3b8' },
+  lastMsgUnread: { fontWeight: '700', color: '#374151' },
 });

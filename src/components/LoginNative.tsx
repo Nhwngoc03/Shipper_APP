@@ -1,37 +1,57 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
   TextInput,
-  StyleSheet
+  StyleSheet,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
-import { 
-  Phone, 
-  Lock, 
-  ArrowRight 
-} from 'lucide-react-native';
+import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { authService } from '../services';
 
 interface LoginNativeProps {
   onLogin: () => void;
 }
 
 export default function LoginNative({ onLogin }: LoginNativeProps) {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Vui lòng nhập email và mật khẩu');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await authService.login({ email, password });
+      onLogin();
+    } catch (err: any) {
+      const msg = err?.data?.message || 'Đăng nhập thất bại. Kiểm tra lại thông tin.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.formContainer}>
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Số điện thoại</Text>
+        <Text style={styles.label}>Email</Text>
         <View style={styles.inputContainer}>
-          <Phone size={20} color="#94a3b8" />
+          <Mail size={20} color="#94a3b8" />
           <TextInput
             style={styles.input}
-            placeholder="090 123 4567"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
+            placeholder="shipper@example.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
             placeholderTextColor="#cbd5e1"
           />
         </View>
@@ -52,12 +72,20 @@ export default function LoginNative({ onLogin }: LoginNativeProps) {
         </View>
       </View>
 
-      <TouchableOpacity 
-        style={styles.submitButton}
-        onPress={onLogin}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
       >
-        <Text style={styles.submitButtonText}>Đăng nhập</Text>
-        <ArrowRight size={20} color="white" />
+        {loading
+          ? <ActivityIndicator color="white" />
+          : <>
+              <Text style={styles.submitButtonText}>Đăng nhập</Text>
+              <ArrowRight size={20} color="white" />
+            </>
+        }
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.forgotButton}>
@@ -68,65 +96,34 @@ export default function LoginNative({ onLogin }: LoginNativeProps) {
 }
 
 const styles = StyleSheet.create({
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
+  formContainer: { paddingHorizontal: 20, paddingVertical: 30 },
+  formGroup: { marginBottom: 20 },
   label: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12, fontWeight: '700', color: '#64748b',
+    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#f1f5f9', borderRadius: 16,
+    paddingHorizontal: 12, borderWidth: 1, borderColor: '#e2e8f0',
   },
   input: {
-    flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
+    flex: 1, paddingVertical: 16, paddingHorizontal: 12,
+    fontSize: 14, fontWeight: '600', color: '#0f172a',
+  },
+  errorText: {
+    color: '#ef4444', fontSize: 13, fontWeight: '600',
+    marginBottom: 12, textAlign: 'center',
   },
   submitButton: {
-    backgroundColor: '#10b981',
-    borderRadius: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    backgroundColor: '#10b981', borderRadius: 16, paddingVertical: 16,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 8, marginTop: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
   },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  forgotButton: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  forgotText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#10b981',
-  },
+  submitButtonDisabled: { backgroundColor: '#6ee7b7' },
+  submitButtonText: { color: 'white', fontSize: 16, fontWeight: '700' },
+  forgotButton: { marginTop: 16, alignItems: 'center' },
+  forgotText: { fontSize: 14, fontWeight: '600', color: '#10b981' },
 });
