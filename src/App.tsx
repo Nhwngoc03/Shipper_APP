@@ -12,8 +12,10 @@ import ProfileNative from './components/ProfileNative';
 import MessagingNative from './components/MessagingNative';
 import ChatDetailNative from './components/ChatDetailNative';
 import SplashScreen from './components/SplashScreen';
+import ShipperMapNative from './components/ShipperMapNative';
 import { authService } from './services';
 import { Conversation } from './services/chat.service';
+import { ShipperOrderResponse } from './services';
 
 type Tab = 'home' | 'active' | 'messaging' | 'notifications' | 'profile';
 
@@ -23,6 +25,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [mapOrder, setMapOrder] = useState<ShipperOrderResponse | null>(null);
+  // ✅ Thêm state vị trí shipper
+  const [shipperPos, setShipperPos] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (authService.isLoggedIn()) {
@@ -32,6 +37,24 @@ export default function App() {
       }).catch(() => {});
     }
   }, []);
+
+  // ✅ Lấy GPS khi đã login
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    navigator.geolocation?.getCurrentPosition(
+      pos => setShipperPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {}
+    );
+    // Watch liên tục để luôn có vị trí mới nhất
+    const watchId = navigator.geolocation?.watchPosition(
+      pos => setShipperPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+    return () => {
+      if (watchId != null) navigator.geolocation?.clearWatch(watchId);
+    };
+  }, [isLoggedIn]);
 
   if (showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
@@ -58,10 +81,17 @@ export default function App() {
     }
     switch (activeTab) {
       case 'home': return <OrdersNative onAcceptOrder={() => setActiveTab('active')} />;
-      case 'active': return <ActiveOrdersNative onOrderCompleted={() => {}} />;
+      case 'active': return (
+        <ActiveOrdersNative
+          onOrderCompleted={() => {}}
+          onOpenMap={(order) => setMapOrder(order)}
+        />
+      );
       case 'messaging': return <MessagingNative onSelectChat={(conv) => setSelectedConv(conv)} />;
       case 'notifications': return <NotificationsNative />;
-      case 'profile': return <ProfileNative onLogout={() => { setIsLoggedIn(false); setCurrentUserId(null); }} />;
+      case 'profile': return (
+        <ProfileNative onLogout={() => { setIsLoggedIn(false); setCurrentUserId(null); }} />
+      );
     }
   };
 
@@ -80,6 +110,26 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
+
+      {/* Full screen map — đè lên toàn bộ UI khi bấm "Xem bản đồ" */}
+      {mapOrder && (
+        <View style={{ position: 'absolute', inset: 0, zIndex: 999 } as any}>
+          <ShipperMapNative
+            orderId={mapOrder.orderId}
+            shopLat={mapOrder.shopLatitude ?? 10.7769}
+            shopLng={mapOrder.shopLongitude ?? 106.7009}
+            destLat={mapOrder.shippingLatitude ?? 10.787}
+            destLng={mapOrder.shippingLongitude ?? 106.711}
+            recipientName={mapOrder.recipientName}
+            // ✅ Truyền vị trí shipper thật vào map
+            shipperLat={shipperPos?.lat}
+            shipperLng={shipperPos?.lng}
+            onBack={() => setMapOrder(null)}
+            onOrderCompleted={() => setMapOrder(null)}
+          />
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <TouchableOpacity onPress={() => setActiveTab('profile')}>
