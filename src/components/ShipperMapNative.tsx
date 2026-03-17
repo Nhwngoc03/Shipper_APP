@@ -10,6 +10,7 @@ import {
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { API_BASE_URL, TOKEN_KEY, shipperService } from '../services';
+import { storage } from '../services/storage';
 
 interface ShipperMapProps {
   orderId: number;
@@ -304,7 +305,7 @@ export default function ShipperMapNative({
   }, []);
 
   // ---- Real GPS tracking ----
-  const startTracking = () => {
+  const startTracking = async () => {
     setTrackingStatus('starting');
     watchIdRef.current = navigator.geolocation?.watchPosition(
       pos => {
@@ -316,7 +317,7 @@ export default function ShipperMapNative({
       { enableHighAccuracy: true, maximumAge: 3000 }
     ) ?? null;
 
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = await storage.getItem(TOKEN_KEY);
     const baseUrl = API_BASE_URL.endsWith('/api/v1') ? API_BASE_URL.slice(0, -7) : API_BASE_URL;
 
     const client = new Client({
@@ -357,9 +358,9 @@ export default function ShipperMapNative({
   };
 
   // ---- FakeGPS ----
-  const connectFakeWS = (): Promise<void> => {
-    return new Promise((resolve) => {
-      const token = localStorage.getItem(TOKEN_KEY);
+  const connectFakeWS = async (): Promise<void> => {
+    return new Promise(async (resolve) => {
+      const token = await storage.getItem(TOKEN_KEY);
       const baseUrl = API_BASE_URL.endsWith('/api/v1') ? API_BASE_URL.slice(0, -7) : API_BASE_URL;
       const client = new Client({
         webSocketFactory: () => new (SockJS as any)(`${baseUrl}/api/v1/ws`),

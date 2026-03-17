@@ -7,6 +7,7 @@ import { Navigation, Play, Square, MapPin } from 'lucide-react-native';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { API_BASE_URL, TOKEN_KEY } from '../services';
+import { storage } from '../services/storage';
 
 interface Coord { lat: number; lng: number; }
 
@@ -93,8 +94,8 @@ export default function FakeGPSNative({
 
   // ✅ Kết nối WebSocket dùng Client + SockJS giống web
   const connectWS = useCallback((): Promise<void> => {
-    return new Promise((resolve) => {
-      const token = localStorage.getItem(TOKEN_KEY);
+    return new Promise(async (resolve) => {
+      const token = await storage.getItem(TOKEN_KEY);
       const baseUrl = API_BASE_URL.endsWith('/api/v1')
         ? API_BASE_URL.slice(0, -7)
         : API_BASE_URL;

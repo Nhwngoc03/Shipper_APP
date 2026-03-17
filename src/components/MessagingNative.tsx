@@ -10,7 +10,7 @@ interface MessagingNativeProps {
   onSelectChat: (conv: Conversation) => void;
 }
 
-const ADMIN_USER_ID = 6;
+const ADMIN_USER_ID = 1;
 const SUPPORT_NAME = 'Trung tâm hỗ trợ';
 
 const formatTime = (iso: string): string => {

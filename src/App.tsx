@@ -30,12 +30,15 @@ export default function App() {
   const [shipperPos, setShipperPos] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (authService.isLoggedIn()) {
-      setIsLoggedIn(true);
-      authService.getMyInfo().then(res => {
-        if (res.result?.id) setCurrentUserId(Number(res.result.id));
-      }).catch(() => {});
-    }
+    (async () => {
+      const loggedIn = await authService.isLoggedIn();
+      if (loggedIn) {
+        setIsLoggedIn(true);
+        authService.getMyInfo().then(res => {
+          if (res.result?.id) setCurrentUserId(Number(res.result.id));
+        }).catch(() => {});
+      }
+    })();
   }, []);
 
   // ✅ Lấy GPS khi đã login

@@ -9,6 +9,7 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { httpClient } from "./http.client";
 import { API_BASE_URL, TOKEN_KEY } from "./api.config";
+import { storage } from "./storage";
 
 export interface Conversation {
   id: number;
@@ -54,10 +55,10 @@ class ChatService {
     await httpClient.patch(`/chat/read/${otherUserId}`);
   }
 
-  connect(onConnected: () => void, onError?: (err: unknown) => void): void {
+  async connect(onConnected: () => void, onError?: (err: unknown) => void): Promise<void> {
     if (this.stompClient?.connected) { onConnected(); return; }
 
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = await storage.getItem(TOKEN_KEY);
     const baseUrl = API_BASE_URL.endsWith("/api/v1")
       ? API_BASE_URL.slice(0, -7)
       : API_BASE_URL;

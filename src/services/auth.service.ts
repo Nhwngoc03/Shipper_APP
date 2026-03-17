@@ -1,6 +1,7 @@
 import { API_BASE_URL, TOKEN_KEY, USER_KEY } from './api.config';
 import { httpClient, ApiResponse } from './http.client';
 import { chatService } from './chat.service';
+import { storage } from './storage';
 
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { token: string; authenticated: boolean; }
@@ -34,7 +35,7 @@ class AuthService {
       if (!role.includes('SHIPPER')) {
         throw { status: 403, data: { message: 'Ứng dụng này chỉ dành cho Shipper. Vui lòng dùng ứng dụng khác.' } };
       }
-      localStorage.setItem(TOKEN_KEY, data.result.token);
+      await storage.setItem(TOKEN_KEY, data.result.token);
     }
     return data;
   }
@@ -43,19 +44,20 @@ class AuthService {
     return httpClient.get<UserResponse>('/users/me');
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
     // Disconnect WebSocket trước khi xóa token — tránh dùng connection cũ khi login lại
     chatService.disconnect();
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    await storage.removeItem(TOKEN_KEY);
+    await storage.removeItem(USER_KEY);
   }
 
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+  async getToken(): Promise<string | null> {
+    return storage.getItem(TOKEN_KEY);
   }
 
-  isLoggedIn(): boolean {
-    return !!this.getToken();
+  async isLoggedIn(): Promise<boolean> {
+    const token = await this.getToken();
+    return !!token;
   }
 }
 

@@ -1,4 +1,5 @@
 import { API_BASE_URL, TOKEN_KEY } from './api.config';
+import { storage } from './storage';
 
 export interface ApiResponse<T> {
   code: number;
@@ -6,20 +7,12 @@ export interface ApiResponse<T> {
   result?: T;
 }
 
-function getToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
 async function request<T>(
   method: string,
   path: string,
   body?: unknown
 ): Promise<ApiResponse<T>> {
-  const token = getToken();
+  const token = await storage.getItem(TOKEN_KEY);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
