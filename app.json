@@ -5,14 +5,29 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Cần vị trí để theo dõi giao hàng",
+        "NSLocationAlwaysUsageDescription": "Cần vị trí để theo dõi giao hàng"
+      }
     },
     "android": {
-      "package": "com.shipperpro.app"
-    }
+      "package": "com.shipperpro.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Cần vị trí để theo dõi giao hàng"
+        }
+      ]
+    ]
   }
 }
