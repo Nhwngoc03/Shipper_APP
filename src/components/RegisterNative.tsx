@@ -1,14 +1,34 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
-  StyleSheet, ScrollView, ActivityIndicator
+  StyleSheet, ScrollView, ActivityIndicator, Image, Platform
 } from 'react-native';
-import { Phone, Lock, User, ArrowRight, FileText, Truck, Mail, CheckCircle } from 'lucide-react-native';
+import { Phone, Lock, User, ArrowRight, FileText, Truck, Mail, CheckCircle, Camera, CreditCard } from 'lucide-react-native';
 import { shipperService, otpService } from '../services';
 import OTPVerificationNative from './OTPVerificationNative';
 
 interface RegisterNativeProps {
-  onRegister: () => void; // quay về tab login
+  onRegister: () => void;
+}
+
+// Chọn ảnh từ thư viện (web: input file, native: cần expo-image-picker)
+async function pickImage(): Promise<{ uri: string; name: string; type: string } | null> {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) { resolve(null); return; }
+        const uri = URL.createObjectURL(file);
+        resolve({ uri, name: file.name, type: file.type });
+      };
+      input.click();
+    });
+  }
+  // Native: cần expo-image-picker — trả về null nếu chưa cài
+  return null;
 }
 
 export default function RegisterNative({ onRegister }: RegisterNativeProps) {
@@ -16,7 +36,11 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
     fullName: '', email: '', phoneNumber: '',
     password: '', confirmPassword: '',
     address: '', vehicleNumber: '', license: '',
+    bankName: '', bankAccount: '', bankAccountHolder: '',
   });
+  const [avatarFile, setAvatarFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [licenseFile, setLicenseFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [vehicleDocFile, setVehicleDocFile] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOtp, setShowOtp] = useState(false);
@@ -52,7 +76,13 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
     setLoading(true);
     try {
       const { fullName, email, phoneNumber, password, address, vehicleNumber, license } = form;
-      await shipperService.register({ fullName, email, phoneNumber, password, address, vehicleNumber, license });
+      await shipperService.register(
+        { fullName, email, phoneNumber, password, address, vehicleNumber, license,
+          bankName: form.bankName, bankAccount: form.bankAccount, bankAccountHolder: form.bankAccountHolder },
+        avatarFile,
+        licenseFile,
+        vehicleDocFile,
+      );
       setShowOtp(false);
       setDone(true);
     } catch (e: any) {
@@ -63,7 +93,6 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
     }
   };
 
-  // Màn success — chờ admin duyệt
   if (done) {
     return (
       <View style={styles.successContainer}>
@@ -93,7 +122,7 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
     );
   }
 
-  const fields: { key: keyof typeof form; label: string; placeholder: string; icon: any; secure?: boolean; keyboard?: any }[] = [
+  const textFields: { key: keyof typeof form; label: string; placeholder: string; icon: any; secure?: boolean; keyboard?: any }[] = [
     { key: 'fullName', label: 'Họ và tên *', placeholder: 'Nguyễn Văn A', icon: User },
     { key: 'email', label: 'Email *', placeholder: 'shipper@example.com', icon: Mail, keyboard: 'email-address' },
     { key: 'phoneNumber', label: 'Số điện thoại *', placeholder: '090 123 4567', icon: Phone, keyboard: 'phone-pad' },
@@ -102,11 +131,32 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
     { key: 'address', label: 'Địa chỉ', placeholder: '123 Đường ABC, Quận 1', icon: FileText },
     { key: 'vehicleNumber', label: 'Biển số xe *', placeholder: '29H1-12345', icon: Truck },
     { key: 'license', label: 'Số bằng lái', placeholder: 'B2-123456', icon: FileText },
+    { key: 'bankName', label: 'Tên ngân hàng', placeholder: 'Vietcombank', icon: CreditCard },
+    { key: 'bankAccount', label: 'Số tài khoản', placeholder: '1234567890', icon: CreditCard, keyboard: 'numeric' },
+    { key: 'bankAccountHolder', label: 'Tên chủ tài khoản', placeholder: 'NGUYEN VAN A', icon: User },
   ];
+
+  const ImagePicker = ({
+    label, file, onPick, hint,
+  }: { label: string; file: { uri: string } | null; onPick: () => void; hint: string }) => (
+    <View style={styles.formGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity style={styles.imagePicker} onPress={onPick}>
+        {file ? (
+          <Image source={{ uri: file.uri }} style={styles.imagePreview} />
+        ) : (
+          <View style={styles.imagePickerEmpty}>
+            <Camera size={24} color="#94a3b8" />
+            <Text style={styles.imagePickerHint}>{hint}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {fields.map(f => {
+      {textFields.map(f => {
         const Icon = f.icon;
         return (
           <View key={f.key} style={styles.formGroup}>
@@ -127,6 +177,26 @@ export default function RegisterNative({ onRegister }: RegisterNativeProps) {
           </View>
         );
       })}
+
+      {/* Image uploads */}
+      <ImagePicker
+        label="Ảnh đại diện"
+        file={avatarFile}
+        onPick={async () => { const f = await pickImage(); if (f) setAvatarFile(f); }}
+        hint="Chọn ảnh đại diện"
+      />
+      <ImagePicker
+        label="Ảnh bằng lái xe *"
+        file={licenseFile}
+        onPick={async () => { const f = await pickImage(); if (f) setLicenseFile(f); }}
+        hint="Chụp / chọn ảnh bằng lái xe"
+      />
+      <ImagePicker
+        label="Ảnh giấy tờ xe *"
+        file={vehicleDocFile}
+        onPick={async () => { const f = await pickImage(); if (f) setVehicleDocFile(f); }}
+        hint="Chụp / chọn ảnh đăng ký xe"
+      />
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -170,4 +240,14 @@ const styles = StyleSheet.create({
   successSub: { fontSize: 14, fontWeight: '500', color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   backToLoginBtn: { backgroundColor: '#10b981', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 },
   backToLoginTxt: { color: 'white', fontSize: 15, fontWeight: '800' },
+  imagePicker: {
+    borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed',
+    borderRadius: 16, overflow: 'hidden', minHeight: 100,
+  },
+  imagePickerEmpty: {
+    minHeight: 100, justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: '#f8fafc',
+  },
+  imagePickerHint: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  imagePreview: { width: '100%', height: 140, resizeMode: 'cover' },
 });

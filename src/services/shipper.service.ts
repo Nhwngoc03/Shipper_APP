@@ -63,12 +63,49 @@ export interface ShipperRegisterRequest {
   address: string;
   license: string;
   vehicleNumber: string;
+  bankName?: string;
+  bankAccount?: string;
+  bankAccountHolder?: string;
 }
 
 class ShipperService {
-  async register(data: ShipperRegisterRequest): Promise<ApiResponse<any>> {
+  async register(
+    data: ShipperRegisterRequest,
+    avatarFile?: { uri: string; name: string; type: string } | null,
+    licenseFile?: { uri: string; name: string; type: string } | null,
+    vehicleDocFile?: { uri: string; name: string; type: string } | null,
+  ): Promise<ApiResponse<any>> {
     const formData = new FormData();
     formData.append('data', JSON.stringify({ ...data, roleName: 'SHIPPER' }));
+
+    if (avatarFile) {
+      // Web: fetch blob từ object URL
+      if (avatarFile.uri.startsWith('blob:')) {
+        const blob = await fetch(avatarFile.uri).then(r => r.blob());
+        formData.append('logoUrl', blob, avatarFile.name);
+      } else {
+        formData.append('logoUrl', { uri: avatarFile.uri, name: avatarFile.name, type: avatarFile.type } as any);
+      }
+    }
+
+    if (licenseFile) {
+      if (licenseFile.uri.startsWith('blob:')) {
+        const blob = await fetch(licenseFile.uri).then(r => r.blob());
+        formData.append('licenseImage', blob, licenseFile.name);
+      } else {
+        formData.append('licenseImage', { uri: licenseFile.uri, name: licenseFile.name, type: licenseFile.type } as any);
+      }
+    }
+
+    if (vehicleDocFile) {
+      if (vehicleDocFile.uri.startsWith('blob:')) {
+        const blob = await fetch(vehicleDocFile.uri).then(r => r.blob());
+        formData.append('vehicleDocImage', blob, vehicleDocFile.name);
+      } else {
+        formData.append('vehicleDocImage', { uri: vehicleDocFile.uri, name: vehicleDocFile.name, type: vehicleDocFile.type } as any);
+      }
+    }
+
     const res = await fetch(`${API_BASE_URL}/users/register`, { method: 'POST', body: formData });
     const json = await res.json();
     if (!res.ok) throw { status: res.status, data: json };

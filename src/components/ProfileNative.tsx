@@ -8,6 +8,9 @@ import {
   LogOut, ChevronRight, Award, Wallet, ArrowLeft, Star
 } from 'lucide-react-native';
 import IncomeNative from './IncomeNative';
+import WalletNative from './WalletNative';
+import PersonalInfoNative from './PersonalInfoNative';
+import DriverVerificationNative from './DriverVerificationNative';
 import { authService, UserResponse } from '../services';
 
 interface ProfileNativeProps {
@@ -31,6 +34,30 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
     onLogout();
   };
 
+  if (selectedMenu === 'verify') {
+    return (
+      <View style={styles.incomeContainer}>
+        <TouchableOpacity style={styles.incomeHeader} onPress={() => setSelectedMenu(null)}>
+          <ArrowLeft size={24} color="#0f172a" />
+          <Text style={styles.incomeHeaderTitle}>Xác minh tài xế</Text>
+        </TouchableOpacity>
+        <DriverVerificationNative onBack={() => setSelectedMenu(null)} />
+      </View>
+    );
+  }
+
+  if (selectedMenu === 'personal') {
+    return (
+      <View style={styles.incomeContainer}>
+        <TouchableOpacity style={styles.incomeHeader} onPress={() => setSelectedMenu(null)}>
+          <ArrowLeft size={24} color="#0f172a" />
+          <Text style={styles.incomeHeaderTitle}>Quay lại</Text>
+        </TouchableOpacity>
+        <PersonalInfoNative onBack={() => setSelectedMenu(null)} />
+      </View>
+    );
+  }
+
   if (selectedMenu === 'income') {
     return (
       <View style={styles.incomeContainer}>
@@ -43,11 +70,23 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
     );
   }
 
+  if (selectedMenu === 'wallet') {
+    return (
+      <View style={styles.incomeContainer}>
+        <TouchableOpacity style={styles.incomeHeader} onPress={() => setSelectedMenu(null)}>
+          <ArrowLeft size={24} color="#0f172a" />
+          <Text style={styles.incomeHeaderTitle}>Quay lại</Text>
+        </TouchableOpacity>
+        <WalletNative />
+      </View>
+    );
+  }
+
   const menuItems = [
     { icon: User, label: 'Thông tin cá nhân', sub: 'Cập nhật hồ sơ của bạn', id: 'personal' },
     { icon: Shield, label: 'Xác minh tài xế', sub: 'Bằng lái, giấy tờ xe', status: 'Đã xác minh', id: 'verify' },
-    { icon: Wallet, label: 'Thu nhập', sub: 'Xem lịch sử giao dịch', id: 'income' },
-    { icon: CreditCard, label: 'Phương thức thanh toán', sub: 'Liên kết ngân hàng, ví', id: 'payment' },
+    { icon: Wallet, label: 'Ví của tôi', sub: 'Số dư & rút tiền', id: 'wallet' },
+    { icon: CreditCard, label: 'Thu nhập', sub: 'Xem lịch sử giao dịch', id: 'income' },
     { icon: Settings, label: 'Cài đặt ứng dụng', sub: 'Thông báo, ngôn ngữ', id: 'settings' },
     { icon: HelpCircle, label: 'Trung tâm hỗ trợ', sub: 'Câu hỏi thường gặp, liên hệ', id: 'support' },
   ];
@@ -107,7 +146,12 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
             <TouchableOpacity
               key={index}
               style={styles.menuItem}
-              onPress={() => item.id === 'income' && setSelectedMenu('income')}
+              onPress={() => {
+                if (item.id === 'personal') setSelectedMenu('personal');
+                else if (item.id === 'verify') setSelectedMenu('verify');
+                else if (item.id === 'income') setSelectedMenu('income');
+                else if (item.id === 'wallet') setSelectedMenu('wallet');
+              }}
             >
               <View style={styles.menuIconContainer}>
                 <Icon size={20} color="#10b981" />

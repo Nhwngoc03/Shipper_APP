@@ -25,6 +25,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [mapOrder, setMapOrder] = useState<ShipperOrderResponse | null>(null);
   // ✅ Thêm state vị trí shipper
   const [shipperPos, setShipperPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -36,6 +37,7 @@ export default function App() {
         setIsLoggedIn(true);
         authService.getMyInfo().then(res => {
           if (res.result?.id) setCurrentUserId(Number(res.result.id));
+          if (res.result?.logoUrl) setUserAvatarUrl(res.result.logoUrl);
         }).catch(() => {});
       }
     })();
@@ -68,6 +70,7 @@ export default function App() {
       setIsLoggedIn(true);
       authService.getMyInfo().then(res => {
         if (res.result?.id) setCurrentUserId(Number(res.result.id));
+        if (res.result?.logoUrl) setUserAvatarUrl(res.result.logoUrl);
       }).catch(() => {});
     }} />;
   }
@@ -137,7 +140,7 @@ export default function App() {
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <TouchableOpacity onPress={() => setActiveTab('profile')}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop' }}
+            source={{ uri: userAvatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop' }}
             style={styles.avatarSmall}
           />
         </TouchableOpacity>

@@ -16,7 +16,13 @@ export interface UserResponse {
   status?: string;
   roleName?: string;
   vehicleNumber?: string;
+  license?: string;
   ratingAverage?: number;
+  bankName?: string;
+  bankAccount?: string;
+  bankAccountHolder?: string;
+  licenseImageUrl?: string;
+  vehicleDocImageUrl?: string;
 }
 
 class AuthService {
@@ -42,6 +48,48 @@ class AuthService {
 
   async getMyInfo(): Promise<ApiResponse<UserResponse>> {
     return httpClient.get<UserResponse>('/users/me');
+  }
+
+  async updateMyInfo(data: {
+    fullName?: string;
+    phoneNumber?: string;
+    address?: string;
+    vehicleNumber?: string;
+    license?: string;
+    bankName?: string;
+    bankAccount?: string;
+    bankAccountHolder?: string;
+  }): Promise<ApiResponse<UserResponse>> {
+    return httpClient.put<UserResponse>('/users/me', data);
+  }
+
+  async updateMyImages(
+    avatarFile?: { uri: string; name: string; type: string } | null,
+    licenseFile?: { uri: string; name: string; type: string } | null,
+    vehicleDocFile?: { uri: string; name: string; type: string } | null,
+  ): Promise<ApiResponse<UserResponse>> {
+    const formData = new FormData();
+    const appendFile = async (key: string, file: { uri: string; name: string; type: string }) => {
+      if (file.uri.startsWith('blob:')) {
+        const blob = await fetch(file.uri).then(r => r.blob());
+        formData.append(key, blob, file.name);
+      } else {
+        formData.append(key, { uri: file.uri, name: file.name, type: file.type } as any);
+      }
+    };
+    if (avatarFile) await appendFile('logoUrl', avatarFile);
+    if (licenseFile) await appendFile('licenseImage', licenseFile);
+    if (vehicleDocFile) await appendFile('vehicleDocImage', vehicleDocFile);
+
+    const token = await this.getToken();
+    const res = await fetch(`${API_BASE_URL}/users/me/images`, {
+      method: 'PATCH',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw { status: res.status, data };
+    return data;
   }
 
   async logout(): Promise<void> {
