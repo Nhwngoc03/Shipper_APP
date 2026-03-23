@@ -15,9 +15,10 @@ import { authService, UserResponse } from '../services';
 
 interface ProfileNativeProps {
   onLogout: () => void;
+  onOpenSupport?: () => void; // ✅ Thêm prop này
 }
 
-export default function ProfileNative({ onLogout }: ProfileNativeProps) {
+export default function ProfileNative({ onLogout, onOpenSupport }: ProfileNativeProps) {
   const [selectedMenu, setSelectedMenu] = useState<string | null>(null);
   const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,7 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
   useEffect(() => {
     authService.getMyInfo()
       .then(res => setUser(res.result || null))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -88,7 +89,7 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
     { icon: Wallet, label: 'Ví của tôi', sub: 'Số dư & rút tiền', id: 'wallet' },
     { icon: CreditCard, label: 'Thu nhập', sub: 'Xem lịch sử giao dịch', id: 'income' },
     { icon: Settings, label: 'Cài đặt ứng dụng', sub: 'Thông báo, ngôn ngữ', id: 'settings' },
-    { icon: HelpCircle, label: 'Trung tâm hỗ trợ', sub: 'Câu hỏi thường gặp, liên hệ', id: 'support' },
+    { icon: HelpCircle, label: 'Trung tâm hỗ trợ', sub: 'Nhắn tin trực tiếp với Admin', id: 'support' }, // ✅ Cập nhật sub
   ];
 
   const avatarUri = user?.logoUrl
@@ -151,6 +152,7 @@ export default function ProfileNative({ onLogout }: ProfileNativeProps) {
                 else if (item.id === 'verify') setSelectedMenu('verify');
                 else if (item.id === 'income') setSelectedMenu('income');
                 else if (item.id === 'wallet') setSelectedMenu('wallet');
+                else if (item.id === 'support') onOpenSupport?.(); // ✅ Gọi prop để mở chat admin
               }}
             >
               <View style={styles.menuIconContainer}>

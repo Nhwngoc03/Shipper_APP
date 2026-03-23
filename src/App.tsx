@@ -19,6 +19,8 @@ import { ShipperOrderResponse } from './services';
 
 type Tab = 'home' | 'active' | 'messaging' | 'notifications' | 'profile';
 
+const ADMIN_USER_ID = 1;
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -27,7 +29,6 @@ export default function App() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [mapOrder, setMapOrder] = useState<ShipperOrderResponse | null>(null);
-  // ✅ Thêm state vị trí shipper
   const [shipperPos, setShipperPos] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -38,28 +39,42 @@ export default function App() {
         authService.getMyInfo().then(res => {
           if (res.result?.id) setCurrentUserId(Number(res.result.id));
           if (res.result?.logoUrl) setUserAvatarUrl(res.result.logoUrl);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     })();
   }, []);
 
-  // ✅ Lấy GPS khi đã login
   useEffect(() => {
     if (!isLoggedIn) return;
     navigator.geolocation?.getCurrentPosition(
       pos => setShipperPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {}
+      () => { }
     );
-    // Watch liên tục để luôn có vị trí mới nhất
     const watchId = navigator.geolocation?.watchPosition(
       pos => setShipperPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
+      () => { },
       { enableHighAccuracy: true, maximumAge: 5000 }
     );
     return () => {
       if (watchId != null) navigator.geolocation?.clearWatch(watchId);
     };
   }, [isLoggedIn]);
+
+  // ✅ Hàm mở chat với admin — dùng cho cả MessagingNative và ProfileNative
+  const handleOpenSupportChat = () => {
+    const adminConv: Conversation = {
+      id: -1,
+      roomKey: '',
+      otherUserId: ADMIN_USER_ID,
+      otherUserName: 'Trung tâm hỗ trợ',
+      otherUserRole: 'ADMIN',
+      lastMessage: '',
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0,
+    };
+    setSelectedConv(adminConv);
+    setActiveTab('messaging');
+  };
 
   if (showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
@@ -71,7 +86,7 @@ export default function App() {
       authService.getMyInfo().then(res => {
         if (res.result?.id) setCurrentUserId(Number(res.result.id));
         if (res.result?.logoUrl) setUserAvatarUrl(res.result.logoUrl);
-      }).catch(() => {});
+      }).catch(() => { });
     }} />;
   }
 
@@ -89,14 +104,17 @@ export default function App() {
       case 'home': return <OrdersNative onAcceptOrder={() => setActiveTab('active')} />;
       case 'active': return (
         <ActiveOrdersNative
-          onOrderCompleted={() => {}}
+          onOrderCompleted={() => { }}
           onOpenMap={(order) => setMapOrder(order)}
         />
       );
       case 'messaging': return <MessagingNative onSelectChat={(conv) => setSelectedConv(conv)} />;
       case 'notifications': return <NotificationsNative />;
       case 'profile': return (
-        <ProfileNative onLogout={() => { setIsLoggedIn(false); setCurrentUserId(null); }} />
+        <ProfileNative
+          onLogout={() => { setIsLoggedIn(false); setCurrentUserId(null); }}
+          onOpenSupport={handleOpenSupportChat} // ✅ Truyền vào đây
+        />
       );
     }
   };
@@ -117,7 +135,6 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Full screen map — đè lên toàn bộ UI khi bấm "Xem bản đồ" */}
       {mapOrder && (
         <View style={{ position: 'absolute', inset: 0, zIndex: 999 } as any}>
           <ShipperMapNative
@@ -127,7 +144,6 @@ export default function App() {
             destLat={mapOrder.shippingLatitude ?? 10.787}
             destLng={mapOrder.shippingLongitude ?? 106.711}
             recipientName={mapOrder.recipientName}
-            // ✅ Truyền vị trí shipper thật vào map
             shipperLat={shipperPos?.lat}
             shipperLng={shipperPos?.lng}
             onBack={() => setMapOrder(null)}
