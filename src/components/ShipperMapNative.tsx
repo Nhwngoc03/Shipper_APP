@@ -16,8 +16,8 @@ import { storage } from '../services/storage';
 // ─── Platform-aware map ───────────────────────────────────────────────────────
 // Web  → Leaflet DOM (MapViewWeb)
 // Native → Leaflet inside WebView (MapViewNative) — không cần Google Maps key!
-const MapViewWeb        = Platform.OS === 'web'  ? require('./MapViewWeb').default  : null;
-const MapViewNativeComp = Platform.OS !== 'web'  ? require('./MapViewNative').default : null;
+const MapViewWeb = Platform.OS === 'web' ? require('./MapViewWeb').default : null;
+const MapViewNativeComp = Platform.OS !== 'web' ? require('./MapViewNative').default : null;
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ShipperMapProps {
@@ -37,6 +37,17 @@ interface Coord { lat: number; lng: number; }
 type Phase = 'idle' | 'loading' | 'to_shop' | 'at_shop' | 'to_buyer' | 'done';
 type Speed = 'fast' | 'normal' | 'slow';
 const SPEED_MS: Record<Speed, number> = { fast: 1000, normal: 3000, slow: 5000 };
+
+/** Tính khoảng cách (mét) giữa 2 toạ độ — Haversine */
+function distanceMeters(a: Coord, b: Coord): number {
+  const R = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const sin2Lat = Math.sin(dLat / 2) ** 2;
+  const sin2Lng = Math.sin(dLng / 2) ** 2;
+  const x = sin2Lat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sin2Lng;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
 
 function nearbyPoint(lat: number, lng: number, offsetKm = 0.5): Coord {
   const offset = offsetKm / 111;
@@ -68,27 +79,29 @@ export default function ShipperMapNative({
   const [currentPos, setCurrentPos] = useState<Coord | null>(
     shipperLat && shipperLng ? { lat: shipperLat, lng: shipperLng } : null
   );
-  const stompRef    = useRef<Client | null>(null);
+  const stompRef = useRef<Client | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const watchIdRef  = useRef<any>(null); // LocationSubscription (native) | number (web)
-  const posRef      = useRef<Coord | null>(currentPos);
+  const watchIdRef = useRef<any>(null); // LocationSubscription (native) | number (web)
+  const posRef = useRef<Coord | null>(currentPos);
 
   // ── FakeGPS ────────────────────────────────────────────────────────────────
-  const [fakeOpen,     setFakeOpen]     = useState(false);
-  const [fakePhase,    setFakePhase]    = useState<Phase>('idle');
+  const [fakeOpen, setFakeOpen] = useState(false);
+  const [fakePhase, setFakePhase] = useState<Phase>('idle');
   const [fakeProgress, setFakeProgress] = useState(0);
   const [fakeStepInfo, setFakeStepInfo] = useState('');
-  const [fakeSpeed,    setFakeSpeed]    = useState<Speed>('normal');
-  const [fakePos,      setFakePos]      = useState<Coord | null>(null);
+  const [fakeSpeed, setFakeSpeed] = useState<Speed>('normal');
+  const [fakePos, setFakePos] = useState<Coord | null>(null);
   // arrivedShop: truyền xuống map để trim route đúng phase
-  const [arrivedShop,  setArrivedShop]  = useState(false);
+  const [arrivedShop, setArrivedShop] = useState(false);
+  /** true khi shipper đã đến điểm giao hàng của buyer */
+  const [arrivedBuyer, setArrivedBuyer] = useState(false);
 
   const fakeStompRef = useRef<Client | null>(null);
   const fakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [completing, setCompleting] = useState<'DELIVERED' | 'FAILED' | null>(null);
 
-  const startPos   = currentPos || nearbyPoint(shopLat, shopLng);
+  const startPos = currentPos || nearbyPoint(shopLat, shopLng);
   const displayPos = fakePos || currentPos || startPos;
 
   // ── startTracking — dùng expo-location trên native, geolocation trên web ──
@@ -117,13 +130,13 @@ export default function ShipperMapNative({
           setCurrentPos(p);
           posRef.current = p;
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true, maximumAge: 3000 }
       ) ?? null;
     }
 
     // STOMP WebSocket — giữ nguyên 100%
-    const token   = await storage.getItem(TOKEN_KEY);
+    const token = await storage.getItem(TOKEN_KEY);
     const baseUrl = API_BASE_URL.endsWith('/api/v1') ? API_BASE_URL.slice(0, -7) : API_BASE_URL;
 
     const client = new Client({
@@ -140,8 +153,8 @@ export default function ShipperMapNative({
           });
         }, 3000);
       },
-      onStompError:  () => setTrackingStatus('error'),
-      onDisconnect:  () => setTrackingStatus(prev => prev === 'active' ? 'error' : prev),
+      onStompError: () => setTrackingStatus('error'),
+      onDisconnect: () => setTrackingStatus(prev => prev === 'active' ? 'error' : prev),
     });
     client.activate();
     stompRef.current = client;
@@ -175,13 +188,13 @@ export default function ShipperMapNative({
   // ── FakeGPS — giữ nguyên 100% ─────────────────────────────────────────────
   const connectFakeWS = async (): Promise<void> => {
     return new Promise(async (resolve) => {
-      const token   = await storage.getItem(TOKEN_KEY);
+      const token = await storage.getItem(TOKEN_KEY);
       const baseUrl = API_BASE_URL.endsWith('/api/v1') ? API_BASE_URL.slice(0, -7) : API_BASE_URL;
-      const client  = new Client({
+      const client = new Client({
         webSocketFactory: () => new (SockJS as any)(`${baseUrl}/api/v1/ws`),
         reconnectDelay: 0,
         connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
-        onConnect:    () => resolve(),
+        onConnect: () => resolve(),
         onStompError: () => resolve(),
       });
       client.activate();
@@ -242,8 +255,9 @@ export default function ShipperMapNative({
           setFakePhase('to_buyer');
           runFakeRoute(route2, '🏠 Giao hàng', () => {
             setFakePhase('done');
-            setFakeStepInfo('✅ Đã giao hàng!');
+            setFakeStepInfo('✅ Đã đến nơi giao hàng!');
             setFakeProgress(100);
+            setArrivedBuyer(true); // ← mở khoá 2 nút
           });
         }, 2000);
       });
@@ -260,6 +274,7 @@ export default function ShipperMapNative({
     setFakeProgress(0);
     setFakeStepInfo('');
     setArrivedShop(false);
+    setArrivedBuyer(false);
   };
 
   // ── Complete order ─────────────────────────────────────────────────────────
@@ -278,16 +293,25 @@ export default function ShipperMapNative({
 
   useEffect(() => () => { stopTracking(); stopFakeGPS(); }, []);
 
+  // Nếu dùng GPS thật, check khoảng cách so với điểm giao hàng
+  useEffect(() => {
+    if (arrivedBuyer) return; // Đã đến rồi thì thôi
+    const pos = fakePos || currentPos;
+    if (!pos) return;
+    const dist = distanceMeters(pos, { lat: destLat, lng: destLng });
+    if (dist <= 150) setArrivedBuyer(true);
+  }, [fakePos, currentPos, arrivedBuyer, destLat, destLng]);
+
   const isFakeRunning = fakePhase !== 'idle' && fakePhase !== 'done' && fakePhase !== 'loading';
-  const isFakeDone    = fakePhase === 'done';
+  const isFakeDone = fakePhase === 'done';
 
   const fakePhaseLabel: Record<Phase, string> = {
-    idle:     'Chưa chạy',
-    loading:  'Đang tải đường đi...',
-    to_shop:  'Đang đến shop lấy hàng',
-    at_shop:  'Đang lấy hàng tại shop',
+    idle: 'Chưa chạy',
+    loading: 'Đang tải đường đi...',
+    to_shop: 'Đang đến shop lấy hàng',
+    at_shop: 'Đang lấy hàng tại shop',
     to_buyer: 'Đang giao đến nhà khách',
-    done:     'Đã giao hàng thành công!',
+    done: 'Đã giao hàng thành công!',
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -307,13 +331,13 @@ export default function ShipperMapNative({
         </View>
         <View style={[
           styles.wsBadge,
-          trackingStatus === 'active'   ? styles.wsActive   :
-          trackingStatus === 'starting' ? styles.wsStarting : styles.wsOff,
+          trackingStatus === 'active' ? styles.wsActive :
+            trackingStatus === 'starting' ? styles.wsStarting : styles.wsOff,
         ]}>
           <View style={[
             styles.wsDot,
-            trackingStatus === 'active'   ? styles.wsDotGreen  :
-            trackingStatus === 'starting' ? styles.wsDotYellow : styles.wsDotGray,
+            trackingStatus === 'active' ? styles.wsDotGreen :
+              trackingStatus === 'starting' ? styles.wsDotYellow : styles.wsDotGray,
           ]} />
           <Text style={styles.wsText}>
             {trackingStatus === 'active' ? 'Live' : trackingStatus === 'starting' ? '...' : 'Off'}
@@ -379,9 +403,9 @@ export default function ShipperMapNative({
           <Text style={styles.sectionTitle}>GPS Thật</Text>
           <View style={[
             styles.gpsStatus,
-            trackingStatus === 'active'   ? styles.gpsActive   :
-            trackingStatus === 'starting' ? styles.gpsStarting :
-            trackingStatus === 'error'    ? styles.gpsError    : styles.gpsOff,
+            trackingStatus === 'active' ? styles.gpsActive :
+              trackingStatus === 'starting' ? styles.gpsStarting :
+                trackingStatus === 'error' ? styles.gpsError : styles.gpsOff,
           ]}>
             {trackingStatus === 'active' ? (
               <><View style={styles.gpsDot} /><Text style={styles.gpsActiveText}>Đang phát GPS live cho buyer theo dõi</Text></>
@@ -409,9 +433,9 @@ export default function ShipperMapNative({
         {/* Hoàn thành đơn */}
         <View style={styles.completeRow}>
           <TouchableOpacity
-            style={[styles.deliveredBtn, completing !== null && styles.btnDisabled]}
+            style={[styles.deliveredBtn, (completing !== null || !arrivedBuyer) && styles.btnDisabled]}
             onPress={() => handleComplete('DELIVERED')}
-            disabled={completing !== null}
+            disabled={completing !== null || !arrivedBuyer}
           >
             {completing === 'DELIVERED'
               ? <ActivityIndicator size="small" color="white" />
@@ -419,9 +443,9 @@ export default function ShipperMapNative({
             }
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.failedBtn, completing !== null && styles.btnDisabled]}
+            style={[styles.failedBtn, (completing !== null || !arrivedBuyer) && styles.btnDisabled]}
             onPress={() => handleComplete('FAILED')}
-            disabled={completing !== null}
+            disabled={completing !== null || !arrivedBuyer}
           >
             {completing === 'FAILED'
               ? <ActivityIndicator size="small" color="#ef4444" />
@@ -447,7 +471,7 @@ export default function ShipperMapNative({
                   <View style={[
                     styles.phaseChip,
                     fakePhase === p && styles.phaseChipActive,
-                    isFakeDone       && styles.phaseChipDone,
+                    isFakeDone && styles.phaseChipDone,
                   ]}>
                     <Text style={[styles.phaseChipText, (fakePhase === p || isFakeDone) && styles.phaseChipTextActive]}>
                       {p === 'to_shop' ? '🏍️ Shop' : p === 'at_shop' ? '🏪 Lấy' : '🏠 Giao'}
@@ -473,9 +497,9 @@ export default function ShipperMapNative({
               <View style={styles.speedRow}>
                 <Text style={styles.speedLabel}>Tốc độ:</Text>
                 {([
-                  { key: 'fast'   as Speed, label: '🐇 Nhanh' },
-                  { key: 'normal' as Speed, label: '🚗 Vừa'   },
-                  { key: 'slow'   as Speed, label: '🐢 Chậm'  },
+                  { key: 'fast' as Speed, label: '🐇 Nhanh' },
+                  { key: 'normal' as Speed, label: '🚗 Vừa' },
+                  { key: 'slow' as Speed, label: '🐢 Chậm' },
                 ]).map(s => (
                   <TouchableOpacity
                     key={s.key}
@@ -528,17 +552,17 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' },
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
-  headerSub:   { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 1 },
-  wsBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  wsActive:    { backgroundColor: '#d1fae5' },
-  wsStarting:  { backgroundColor: '#fef3c7' },
-  wsOff:       { backgroundColor: '#f1f5f9' },
-  wsDot:       { width: 6, height: 6, borderRadius: 3 },
-  wsDotGreen:  { backgroundColor: '#10b981' },
+  headerSub: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 1 },
+  wsBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  wsActive: { backgroundColor: '#d1fae5' },
+  wsStarting: { backgroundColor: '#fef3c7' },
+  wsOff: { backgroundColor: '#f1f5f9' },
+  wsDot: { width: 6, height: 6, borderRadius: 3 },
+  wsDotGreen: { backgroundColor: '#10b981' },
   wsDotYellow: { backgroundColor: '#f59e0b' },
-  wsDotGray:   { backgroundColor: '#94a3b8' },
+  wsDotGray: { backgroundColor: '#94a3b8' },
   wsText: { fontSize: 10, fontWeight: '800', color: '#374151', textTransform: 'uppercase' },
-  mapWrapper:    { height: 320, backgroundColor: '#e2e8f0', position: 'relative' },
+  mapWrapper: { height: 320, backgroundColor: '#e2e8f0', position: 'relative' },
   legendOverlay: {
     position: 'absolute', bottom: 10, left: 10,
     backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 10, padding: 8, gap: 4,
@@ -546,7 +570,7 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendLine: { width: 20, height: 3, borderRadius: 2 },
   legendText: { fontSize: 10, fontWeight: '700', color: '#374151' },
-  controls:   { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  controls: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   coordBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#d1fae5', borderRadius: 10, padding: 8, marginBottom: 10,
@@ -557,16 +581,16 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5 },
-  gpsStatus:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  gpsActive:   { backgroundColor: '#d1fae5', borderWidth: 1, borderColor: '#a7f3d0' },
+  gpsStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  gpsActive: { backgroundColor: '#d1fae5', borderWidth: 1, borderColor: '#a7f3d0' },
   gpsStarting: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fde68a' },
-  gpsError:    { backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fecaca' },
-  gpsOff:      { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
-  gpsDot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' },
-  gpsActiveText:   { fontSize: 12, fontWeight: '700', color: '#065f46', flex: 1 },
+  gpsError: { backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fecaca' },
+  gpsOff: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  gpsDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' },
+  gpsActiveText: { fontSize: 12, fontWeight: '700', color: '#065f46', flex: 1 },
   gpsStartingText: { fontSize: 12, fontWeight: '700', color: '#92400e' },
-  gpsErrorText:    { fontSize: 12, fontWeight: '700', color: '#ef4444' },
-  gpsOffText:      { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
+  gpsErrorText: { fontSize: 12, fontWeight: '700', color: '#ef4444' },
+  gpsOffText: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
   startBtn: {
     backgroundColor: '#3b82f6', borderRadius: 12, paddingVertical: 11,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7,
@@ -587,38 +611,44 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#fecaca',
   },
   completeBtnText: { color: 'white', fontSize: 14, fontWeight: '700' },
-  failedBtnText:   { color: '#ef4444', fontSize: 14, fontWeight: '700' },
-  btnDisabled:     { opacity: 0.5 },
+  failedBtnText: { color: '#ef4444', fontSize: 14, fontWeight: '700' },
+  btnDisabled: { opacity: 0.4 },
+  notArrivedBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff7ed', borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: '#fed7aa', marginTop: -4, marginBottom: 4,
+  },
+  notArrivedText: { fontSize: 11, fontWeight: '600', color: '#c2410c', flex: 1, textAlign: 'center' },
   fakeToggle: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#fefce8', borderRadius: 14, padding: 12, marginBottom: 4,
     borderWidth: 1, borderColor: '#fde68a', borderStyle: 'dashed',
   },
   fakeToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  fakeIcon:       { width: 28, height: 28, backgroundColor: '#fef3c7', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  fakeIcon: { width: 28, height: 28, backgroundColor: '#fef3c7', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   fakeToggleText: { fontSize: 13, fontWeight: '700', color: '#92400e' },
   fakeSection: {
     backgroundColor: 'white', borderRadius: 16, padding: 14, marginBottom: 10, gap: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  phaseRow:           { flexDirection: 'row', alignItems: 'center' },
-  phaseChip:          { flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: '#e2e8f0', alignItems: 'center' },
-  phaseChipActive:    { backgroundColor: '#10b981' },
-  phaseChipDone:      { backgroundColor: '#3b82f6' },
-  phaseChipText:      { fontSize: 10, fontWeight: '800', color: '#64748b' },
-  phaseChipTextActive:{ color: 'white' },
-  phaseLine:    { width: 8, height: 2, backgroundColor: '#e2e8f0' },
-  phaseStatus:  { fontSize: 12, fontWeight: '700', color: '#047857', textAlign: 'center' },
+  phaseRow: { flexDirection: 'row', alignItems: 'center' },
+  phaseChip: { flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: '#e2e8f0', alignItems: 'center' },
+  phaseChipActive: { backgroundColor: '#10b981' },
+  phaseChipDone: { backgroundColor: '#3b82f6' },
+  phaseChipText: { fontSize: 10, fontWeight: '800', color: '#64748b' },
+  phaseChipTextActive: { color: 'white' },
+  phaseLine: { width: 8, height: 2, backgroundColor: '#e2e8f0' },
+  phaseStatus: { fontSize: 12, fontWeight: '700', color: '#047857', textAlign: 'center' },
   progressWrap: { gap: 4 },
-  progressBg:   { height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, overflow: 'hidden' },
+  progressBg: { height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 3 },
   progressText: { fontSize: 10, color: '#64748b', fontWeight: '600' },
-  speedRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  speedLabel:   { fontSize: 11, fontWeight: '700', color: '#475569' },
-  speedBtn:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e2e8f0' },
-  speedBtnActive:    { backgroundColor: '#10b981' },
-  speedBtnText:      { fontSize: 11, fontWeight: '700', color: '#64748b' },
-  speedBtnTextActive:{ color: 'white' },
+  speedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  speedLabel: { fontSize: 11, fontWeight: '700', color: '#475569' },
+  speedBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e2e8f0' },
+  speedBtnActive: { backgroundColor: '#10b981' },
+  speedBtnText: { fontSize: 11, fontWeight: '700', color: '#64748b' },
+  speedBtnTextActive: { color: 'white' },
   fakeStartBtn: {
     backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 11,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7,
@@ -632,5 +662,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7,
   },
   loadingBtnText: { fontSize: 13, fontWeight: '700', color: '#92400e' },
-  disclaimer:     { fontSize: 10, color: '#9ca3af', textAlign: 'center', fontStyle: 'italic' },
+  disclaimer: { fontSize: 10, color: '#9ca3af', textAlign: 'center', fontStyle: 'italic' },
 });
