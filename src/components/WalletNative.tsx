@@ -47,7 +47,7 @@ export default function WalletNative() {
     if (!form.amount || isNaN(amount) || amount <= 0) {
       setError('Vui lòng nhập số tiền hợp lệ'); return;
     }
-    if (wallet && amount > wallet.totalBalance) {
+    if (wallet && amount > wallet.frozenBalance) {
       setError('Số tiền vượt quá số dư khả dụng'); return;
     }
     if (!form.bankName || !form.bankAccountNumber || !form.bankAccountHolder) {
@@ -115,7 +115,7 @@ export default function WalletNative() {
           <View>
             <Text style={styles.walletLabel}>Số dư khả dụng</Text>
             <Text style={styles.walletBalance}>
-              {(wallet?.totalBalance ?? 0).toLocaleString('vi-VN')}đ
+              {(wallet?.frozenBalance ?? 0).toLocaleString('vi-VN')}đ
             </Text>
           </View>
         </View>
@@ -202,7 +202,7 @@ export default function WalletNative() {
             <Text style={styles.modalTitle}>Yêu cầu rút tiền</Text>
 
             <Text style={styles.modalBalance}>
-              Số dư: {(wallet?.totalBalance ?? 0).toLocaleString('vi-VN')}đ
+              Số dư: {(wallet?.frozenBalance ?? 0).toLocaleString('vi-VN')}đ
             </Text>
 
             {[
